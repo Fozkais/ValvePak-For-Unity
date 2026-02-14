@@ -3,8 +3,11 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
+using Org.BouncyCastle.Crypto;
+using Org.BouncyCastle.Crypto.Signers;
+using Org.BouncyCastle.Security;
 
-namespace SteamDatabase.ValvePak
+namespace ValvePak
 {
 	/// <summary>
 	/// VPK (Valve Pak) files are uncompressed archives used to package game content.
@@ -79,28 +82,42 @@ namespace SteamDatabase.ValvePak
 			Debug.Assert(ArchiveMD5EntriesChecksum != null);
 			Debug.Assert(WholeFileChecksum != null);
 
-			using var subStream = new SubStream(Reader.BaseStream, HeaderSize, (int)TreeSize);
-			var hash = MD5.HashData(subStream);
+			byte[] hash;
+
+			using (var subStream = new SubStream(Reader!.BaseStream, HeaderSize, (int)TreeSize))
+			{
+				hash = MD5Extensions.ComputeMD5(subStream);
+			}
 
 			if (!hash.SequenceEqual(TreeChecksum))
 			{
-				throw new InvalidDataException($"File tree checksum mismatch ({BitConverter.ToString(hash)} != expected {BitConverter.ToString(TreeChecksum)})");
+				throw new InvalidDataException(
+					$"File tree checksum mismatch ({BitConverter.ToString(hash)} != expected {BitConverter.ToString(TreeChecksum)})"
+				);
 			}
 
-			using var subStream2 = new SubStream(Reader.BaseStream, FileSizeBeforeArchiveMD5Entries, (int)ArchiveMD5SectionSize);
-			hash = MD5.HashData(subStream2);
+			using (var subStream2 = new SubStream(Reader.BaseStream, FileSizeBeforeArchiveMD5Entries, (int)ArchiveMD5SectionSize))
+			{
+				hash = MD5Extensions.ComputeMD5(subStream2);
+			}
 
 			if (!hash.SequenceEqual(ArchiveMD5EntriesChecksum))
 			{
-				throw new InvalidDataException($"Archive MD5 entries checksum mismatch ({BitConverter.ToString(hash)} != expected {BitConverter.ToString(ArchiveMD5EntriesChecksum)})");
+				throw new InvalidDataException(
+					$"Archive MD5 entries checksum mismatch ({BitConverter.ToString(hash)} != expected {BitConverter.ToString(ArchiveMD5EntriesChecksum)})"
+				);
 			}
 
-			using var subStream3 = new SubStream(Reader.BaseStream, 0, FileSizeBeforeWholeFileHash);
-			hash = MD5.HashData(subStream3);
+			using (var subStream3 = new SubStream(Reader.BaseStream, 0, FileSizeBeforeWholeFileHash))
+			{
+				hash = MD5Extensions.ComputeMD5(subStream3);
+			}
 
 			if (!hash.SequenceEqual(WholeFileChecksum))
 			{
-				throw new InvalidDataException($"Package checksum mismatch ({BitConverter.ToString(hash)} != expected {BitConverter.ToString(WholeFileChecksum)})");
+				throw new InvalidDataException(
+					$"Package checksum mismatch ({BitConverter.ToString(hash)} != expected {BitConverter.ToString(WholeFileChecksum)})"
+				);
 			}
 		}
 
@@ -120,7 +137,7 @@ namespace SteamDatabase.ValvePak
 				.OrderBy(x => x.Key)
 				.SelectMany(x => x);
 
-			Span<byte> hash = stackalloc byte[16];
+			var hash = new byte[16];
 
 			try
 			{
@@ -156,20 +173,11 @@ namespace SteamDatabase.ValvePak
 					switch (entry.HashType)
 					{
 						case EHashType.Blake3:
-							using (var hasher = Blake3.Hasher.New())
-							{
-								var buffer = new byte[8192]; // TODO: Fix this alloc
-								int bytesRead;
-								while ((bytesRead = subStream.Read(buffer, 0, buffer.Length)) > 0)
-								{
-									hasher.UpdateWithJoin(buffer.AsSpan(0, bytesRead));
-								}
-								hasher.Finalize(hash);
-							}
+							HashUtils.ComputeSHA256(subStream, hash);
 							break;
 
 						case EHashType.MD5:
-							MD5.HashData(subStream, hash);
+							MD5Extensions.HashData(stream, hash);
 							break;
 
 						default:
@@ -178,7 +186,7 @@ namespace SteamDatabase.ValvePak
 
 					if (!hash.SequenceEqual(entry.Checksum))
 					{
-						throw new InvalidDataException($"Package checksum mismatch ({hashTypeName}) in archive {entry.ArchiveIndex} at {entry.Offset} ({Convert.ToHexString(hash)} != expected {Convert.ToHexString(entry.Checksum)})");
+						throw new InvalidDataException($"Package checksum mismatch ({hashTypeName}) in archive {entry.ArchiveIndex} at {entry.Offset} ({hash.ToHexString()} != expected {entry.Checksum.ToHexString()})");
 					}
 				}
 
@@ -237,36 +245,50 @@ namespace SteamDatabase.ValvePak
 				return false;
 			}
 
-			using var rsa = RSA.Create();
-			rsa.ImportSubjectPublicKeyInfo(PublicKey, out _);
-
-			if (SignatureType == ESignatureType.OnlyFileChecksum)
+			AsymmetricKeyParameter rsaKey;
+			try
 			{
-				if (WholeFileChecksum == null)
-				{
-					return false;
-				}
-
-				using var subStream3 = new SubStream(Reader.BaseStream, 0, FileSizeBeforeWholeFileHash);
-				var hash = MD5.HashData(subStream3);
-
-				if (!hash.SequenceEqual(WholeFileChecksum))
-				{
-					return false;
-				}
-
-				// SHA256(MD5) is certainly a choice
-				return rsa.VerifyData(hash, Signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+				rsaKey = PublicKeyFactory.CreateKey(PublicKey); // PublicKey = byte[] DER/PEM
 			}
-
-			if (SignatureType != ESignatureType.FullFile)
+			catch
 			{
 				return false;
 			}
 
+			if (SignatureType == ESignatureType.OnlyFileChecksum)
+			{
+				if (WholeFileChecksum == null)
+					return false;
+
+				using var subStream3 = new SubStream(Reader.BaseStream, 0, FileSizeBeforeWholeFileHash);
+				var hash = MD5Extensions.ComputeMD5(subStream3);
+
+				if (!hash.SequenceEqual(WholeFileChecksum))
+					return false;
+
+				var signer = new RsaDigestSigner(new Org.BouncyCastle.Crypto.Digests.Sha256Digest());
+				signer.Init(false, rsaKey);
+
+				signer.BlockUpdate(hash, 0, hash.Length);
+				return signer.VerifySignature(Signature);
+			}
+
+			if (SignatureType != ESignatureType.FullFile)
+				return false;
+
 			using var subStream = new SubStream(Reader.BaseStream, 0, FileSizeBeforeSignature);
 
-			return rsa.VerifyData(subStream, Signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+			byte[] fileBytes;
+			using (var ms = new MemoryStream())
+			{
+				subStream.CopyTo(ms);
+				fileBytes = ms.ToArray();
+			}
+
+			var fullSigner = new RsaDigestSigner(new Org.BouncyCastle.Crypto.Digests.Sha256Digest());
+			fullSigner.Init(false, rsaKey);
+			fullSigner.BlockUpdate(fileBytes, 0, fileBytes.Length);
+			return fullSigner.VerifySignature(Signature);
 		}
 	}
 }

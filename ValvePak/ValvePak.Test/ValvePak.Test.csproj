@@ -1,12 +1,13 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
     <RollForward>LatestMajor</RollForward>
     <IsTestProject>true</IsTestProject>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>../ValvePak/ValvePak.snk</AssemblyOriginatorKeyFile>
     <Nullable>enable</Nullable>
+    <TargetFrameworks>netstandard2.0;netstandard2.1</TargetFrameworks>
+    <OutputType>Library</OutputType>
   </PropertyGroup>
 
   <ItemGroup>

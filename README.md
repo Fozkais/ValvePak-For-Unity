@@ -1,10 +1,11 @@
-<h1><img src="./Misc/logo.png" width="64" align="center"> Valve Pak (vpk) for .NET</h1>
+<h1><img src="./Misc/logo.png" width="64" align="center"> Valve Pak (vpk) for .NETStandard</h1>
 
 [![Build Status (GitHub)](https://img.shields.io/github/actions/workflow/status/ValveResourceFormat/ValvePak/ci.yml?label=Build&style=flat-square&branch=master)](https://github.com/ValveResourceFormat/ValvePak/actions)
 [![NuGet](https://img.shields.io/nuget/v/ValvePak.svg?label=NuGet&style=flat-square)](https://www.nuget.org/packages/ValvePak/)
 [![Coverage Status](https://img.shields.io/codecov/c/github/ValveResourceFormat/ValvePak/master?label=Coverage&style=flat-square)](https://app.codecov.io/gh/ValveResourceFormat/ValvePak)
 
-VPK (Valve Pak) files are uncompressed archives used to package game content.
+This Fork make the library compatible with netstandard 2.0 and netstandard 2.1<br/>
+VPK (Valve Pak) files are uncompressed archives used to package game content.<br/>
 This library allows you to read and extract files out of these paks.
 
 Usage:

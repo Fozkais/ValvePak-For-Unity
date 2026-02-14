@@ -7,7 +7,7 @@ using System.IO.Hashing;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace SteamDatabase.ValvePak
+namespace ValvePak
 {
 	public partial class Package
 	{
@@ -18,7 +18,8 @@ namespace SteamDatabase.ValvePak
 		/// <returns>Returns true if entry was removed, false otherwise.</returns>
 		public bool RemoveFile(PackageEntry entry)
 		{
-			ArgumentNullException.ThrowIfNull(entry);
+			if (entry == null)
+				throw new ArgumentNullException(nameof(entry));
 
 			if (Entries == null)
 			{
@@ -48,21 +49,22 @@ namespace SteamDatabase.ValvePak
 		/// <returns>The added entry.</returns>
 		public PackageEntry AddFile(string filePath, byte[] fileData)
 		{
-			ArgumentNullException.ThrowIfNull(filePath);
+			if (string.IsNullOrEmpty(filePath))
+				throw new ArgumentNullException(nameof(filePath));
 
 			filePath = filePath.Replace(WindowsDirectorySeparator, DirectorySeparatorChar);
 
 			var lastSeparator = filePath.LastIndexOf(DirectorySeparatorChar);
-			var directory = lastSeparator > -1 ? filePath[..lastSeparator] : string.Empty;
-			var fileName = filePath[(lastSeparator + 1)..];
+			string directory = lastSeparator > -1 ? filePath.Substring(0, lastSeparator) : string.Empty;
+			string fileName = lastSeparator > -1 ? filePath.Substring(lastSeparator + 1) : filePath;
 
 			var dot = fileName.LastIndexOf('.');
 			string extension;
 
 			if (dot > -1)
 			{
-				extension = fileName[(dot + 1)..];
-				fileName = fileName[..dot];
+				extension = fileName.Substring(dot + 1); // après le point jusqu'à la fin
+				fileName = fileName.Substring(0, dot);   // du début jusqu'au point
 			}
 			else
 			{
@@ -70,25 +72,52 @@ namespace SteamDatabase.ValvePak
 				extension = Space;
 			}
 
+
 			if (directory.Length == 0)
 			{
 				directory = Space;
 			}
 
 			// Putting file data into SmallData is kind of a hack
-			var entry = new PackageEntry
-			{
-				FileName = fileName,
-				DirectoryName = directory,
-				TypeName = extension,
-				SmallData = fileData,
-				CRC32 = Crc32.HashToUInt32(fileData),
-				ArchiveIndex = 0x7FFF,
-			};
+			var entry = new PackageEntry(
+
+				fileName,
+				directory,
+				extension,
+				fileData,
+				Crc32.HashToUInt32(fileData),
+				0x7FFF
+			);
 
 			if (Entries == null)
 			{
-				var stringComparer = Comparer == null ? null : StringComparer.FromComparison(Comparer.Comparison);
+				StringComparer stringComparer = StringComparer.CurrentCulture;
+				if (Comparer != null)
+				{
+					switch (Comparer.Comparison)
+					{
+						case StringComparison.CurrentCulture:
+							stringComparer = StringComparer.CurrentCulture;
+							break;
+						case StringComparison.CurrentCultureIgnoreCase:
+							stringComparer = StringComparer.CurrentCultureIgnoreCase;
+							break;
+						case StringComparison.InvariantCulture:
+							stringComparer = StringComparer.InvariantCulture;
+							break;
+						case StringComparison.InvariantCultureIgnoreCase:
+							stringComparer = StringComparer.InvariantCultureIgnoreCase;
+							break;
+						case StringComparison.Ordinal:
+							stringComparer = StringComparer.Ordinal;
+							break;
+						case StringComparison.OrdinalIgnoreCase:
+							stringComparer = StringComparer.OrdinalIgnoreCase;
+							break;
+						default:
+							throw new ArgumentOutOfRangeException();
+					}
+				}
 				Entries = new Dictionary<string, List<PackageEntry>>(stringComparer);
 			}
 
@@ -126,7 +155,8 @@ namespace SteamDatabase.ValvePak
 				throw new InvalidOperationException("This package was opened from a _dir.vpk, writing back is currently unsupported.");
 			}
 
-			ArgumentNullException.ThrowIfNull(stream);
+			if (stream == null)
+				throw new ArgumentNullException(nameof(stream));
 
 			if (!stream.CanSeek || !stream.CanRead)
 			{
@@ -287,14 +317,12 @@ namespace SteamDatabase.ValvePak
 
 				writer.Write(treeHash);
 
-				fullFileMD5.TransformBlock(treeHash, 0, treeHash.Length, null, 0);
+				fullFileMD5.TransformBlock(treeHash!, 0, treeHash!.Length, null, 0);
 
-				// File hashes hash
-				var fileHashesMD5 = MD5.HashData([]); // We did not write any file hashes
-				writer.Write(fileHashesMD5);
+				var fileHashesMd5 = MD5Extensions.ComputeMD5(Array.Empty<byte>());
+				writer.Write(fileHashesMd5);
 
-				// Full file hash
-				fullFileMD5.TransformFinalBlock(fileHashesMD5, 0, fileHashesMD5.Length);
+				fullFileMD5.TransformFinalBlock(fileHashesMd5, 0, fileHashesMd5.Length);
 				var fullHash = fullFileMD5.Hash;
 				Debug.Assert(fullHash != null);
 				writer.Write(fullHash);

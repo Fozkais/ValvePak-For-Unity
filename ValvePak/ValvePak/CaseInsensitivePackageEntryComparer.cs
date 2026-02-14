@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 
-namespace SteamDatabase.ValvePak
+namespace ValvePak
 {
 	sealed class CaseInsensitivePackageEntryComparer(StringComparison comparison) : IComparer<PackageEntry>
 	{
@@ -13,31 +13,20 @@ namespace SteamDatabase.ValvePak
 		/// </remarks>
 		public int Compare(PackageEntry? x, PackageEntry? y)
 		{
-			Debug.Assert(x != null);
-			Debug.Assert(y != null);
+			if (x == null) throw new ArgumentNullException(nameof(x));
+			if (y == null) throw new ArgumentNullException(nameof(y));
 
 			var comp = x.FileName.Length.CompareTo(y.FileName.Length);
-
-			if (comp != 0)
-			{
-				return comp;
-			}
+			if (comp != 0) return comp;
 
 			comp = x.DirectoryName.Length.CompareTo(y.DirectoryName.Length);
-
-			if (comp != 0)
-			{
-				return comp;
-			}
+			if (comp != 0) return comp;
 
 			comp = string.Compare(x.FileName, y.FileName, Comparison);
-
-			if (comp != 0)
-			{
-				return comp;
-			}
+			if (comp != 0) return comp;
 
 			return string.Compare(x.DirectoryName, y.DirectoryName, Comparison);
 		}
+
 	}
 }

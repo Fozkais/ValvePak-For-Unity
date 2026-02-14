@@ -1,9 +1,8 @@
 using System.IO;
 using System.Text;
 using NUnit.Framework;
-using SteamDatabase.ValvePak;
 
-namespace Tests
+namespace ValvePak.Test
 {
 	[TestFixture]
 	public class WriteTest

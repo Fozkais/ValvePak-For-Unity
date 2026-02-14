@@ -1,7 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Product>Valve Pak Library</Product>
     <Description>Fully fledged library to work with Valve's Pak (VPK) archives</Description>
@@ -14,12 +13,13 @@
     <AssemblyOriginatorKeyFile>ValvePak.snk</AssemblyOriginatorKeyFile>
     <IsAotCompatible>True</IsAotCompatible>
     <Nullable>enable</Nullable>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
 	<NoWarn>$(NoWarn);CS8002</NoWarn>
+	<TargetFrameworks>netstandard2.0;netstandard2.1</TargetFrameworks>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Blake3" Version="2.0.0" />
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.7.0-beta.98" />
     <PackageReference Include="System.IO.Hashing" Version="9.0.11" />
   </ItemGroup>
 

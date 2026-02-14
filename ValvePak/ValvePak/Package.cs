@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.MemoryMappedFiles;
 
-namespace SteamDatabase.ValvePak
+namespace ValvePak
 {
 	/// <summary>
 	/// VPK (Valve Pak) files are uncompressed archives used to package game content.
@@ -152,18 +152,19 @@ namespace SteamDatabase.ValvePak
 		/// <param name="fileName">Filename.</param>
 		public void SetFileName(string fileName)
 		{
-			ArgumentNullException.ThrowIfNull(fileName);
+			if (String.IsNullOrEmpty(fileName))
+				throw new ArgumentNullException(nameof(fileName));
 
 			if (fileName.EndsWith(".vpk", StringComparison.OrdinalIgnoreCase))
 			{
-				fileName = fileName[0..^4];
+				fileName = fileName.Substring(0, fileName.Length - 4);
 			}
 
 			if (fileName.EndsWith("_dir", StringComparison.OrdinalIgnoreCase))
 			{
 				IsDirVPK = true;
 
-				fileName = fileName[0..^4];
+				fileName = fileName.Substring(0, fileName.Length - 4);
 			}
 
 			FileName = fileName;
@@ -181,7 +182,8 @@ namespace SteamDatabase.ValvePak
 		/// </remarks>
 		public PackageEntry? FindEntry(string filePath)
 		{
-			ArgumentNullException.ThrowIfNull(filePath);
+			if (String.IsNullOrEmpty(filePath))
+				throw new ArgumentNullException(nameof(filePath));
 
 			// Normalize path separators when reading the file list
 			var filePathSpan = filePath.Replace(WindowsDirectorySeparator, DirectorySeparatorChar).AsSpan();
@@ -201,21 +203,21 @@ namespace SteamDatabase.ValvePak
 		/// </remarks>
 		public PackageEntry? FindEntry(ReadOnlySpan<char> filePath)
 		{
-			var lastSeparator = filePath.LastIndexOf(DirectorySeparatorChar);
-			var directory = lastSeparator > -1 ? filePath[..lastSeparator] : string.Empty;
-			var fileName = filePath[(lastSeparator + 1)..];
+			string pathStr = filePath.ToString();
+			var lastSeparator = pathStr.LastIndexOf(DirectorySeparatorChar);
+			string directory = lastSeparator > -1 ? pathStr.Substring(0, lastSeparator) : string.Empty;
+			string fileName = lastSeparator > -1 ? pathStr.Substring(lastSeparator + 1) : pathStr;
 
 			var dot = fileName.LastIndexOf('.');
 			string extension;
 
 			if (dot > -1)
 			{
-				extension = fileName[(dot + 1)..].ToString();
-				fileName = fileName[..dot];
+				extension = fileName.Substring(dot + 1);
+				fileName = fileName.Substring(0, dot);
 			}
 			else
 			{
-				// Valve uses a space for missing extensions
 				extension = Space;
 			}
 
@@ -240,7 +242,8 @@ namespace SteamDatabase.ValvePak
 				for (var i = 0; i <= hi; i++) // Don't use foreach
 				{
 					var entry = entriesForExtension[i];
-					if (directory.SequenceEqual(entry.DirectoryName) && fileName.SequenceEqual(entry.FileName))
+					if (string.Equals(directory, entry.DirectoryName, StringComparison.Ordinal) &&
+					    string.Equals(fileName, entry.FileName, StringComparison.Ordinal))
 					{
 						return entry;
 					}

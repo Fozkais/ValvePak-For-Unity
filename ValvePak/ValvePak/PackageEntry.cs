@@ -1,4 +1,6 @@
-namespace SteamDatabase.ValvePak
+using System;
+
+namespace ValvePak
 {
 	/// <summary>
 	/// Represents a file entry in a VPK package.
@@ -6,25 +8,70 @@ namespace SteamDatabase.ValvePak
 	public class PackageEntry
 	{
 		/// <summary>
+		///  Default Constructor
+		/// </summary>
+		/// <param name="fileName"></param>
+		/// <param name="directoryName"></param>
+		/// <param name="typeName"></param>
+		/// <param name="crc32"></param>
+		/// <param name="length"></param>
+		/// <param name="offset"></param>
+		/// <param name="archiveIndex"></param>
+		public PackageEntry(string fileName, string directoryName, string typeName, uint crc32, uint length, uint offset, ushort archiveIndex)
+		{
+			FileName = fileName;
+			DirectoryName = directoryName;
+			TypeName = typeName;
+			CRC32 = crc32;
+			Length = length;
+			Offset = offset;
+			ArchiveIndex = archiveIndex;
+		}
+
+		public PackageEntry(string fileName, string directoryName, string typeName, uint crc32)
+		{
+			if (fileName == null) throw new ArgumentNullException(nameof(fileName));
+			if (typeName == null) throw new ArgumentNullException(nameof(typeName));
+
+			FileName = fileName;
+			DirectoryName = directoryName;
+			TypeName = typeName;
+			CRC32 = crc32;
+		}
+
+		public PackageEntry(string fileName, string directoryName, string typeName, byte[] fileData, uint hashToUInt32, ushort offset)
+		{
+			if (fileName == null) throw new ArgumentNullException(nameof(fileName));
+			if (typeName == null) throw new ArgumentNullException(nameof(typeName));
+
+			FileName = fileName;
+			DirectoryName = directoryName;
+			TypeName = typeName;
+			SmallData = fileData;
+			CRC32 = hashToUInt32;
+			ArchiveIndex = offset;
+		}
+
+		/// <summary>
 		/// Gets or sets file name of this entry.
 		/// </summary>
 		/// <remarks>
 		/// This does not contain <see cref="TypeName"/>.
 		/// </remarks>
-		public required string FileName { get; set; }
+		public string FileName { get; set; }
 
 		/// <summary>
 		/// Gets or sets the name of the directory this file is in.
 		/// '/' is always used as a directory separator in Valve's implementation.
 		/// Directory names are also always lower cased in Valve's implementation.
 		/// </summary>
-		public required string DirectoryName { get; set; }
+		public string DirectoryName { get; set; }
 
 		/// <summary>
 		/// Gets or sets the file extension.
 		/// If the file has no extension, this is an empty string.
 		/// </summary>
-		public required string TypeName { get; set; }
+		public string TypeName { get; set; }
 
 		/// <summary>
 		/// Gets or sets the CRC32 checksum of this entry.

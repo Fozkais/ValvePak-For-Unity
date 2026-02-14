@@ -7,7 +7,7 @@ using System.IO.MemoryMappedFiles;
 using System.Runtime.CompilerServices;
 using System.Text;
 
-namespace SteamDatabase.ValvePak
+namespace ValvePak
 {
 	/// <summary>
 	/// VPK (Valve Pak) files are uncompressed archives used to package game content.
@@ -34,7 +34,8 @@ namespace SteamDatabase.ValvePak
 		/// <param name="input">The input <see cref="Stream"/> to read from.</param>
 		public void Read(Stream input)
 		{
-			ArgumentNullException.ThrowIfNull(input);
+			if (input == null)
+				throw new ArgumentNullException(nameof(input));
 
 			if (FileName == null)
 			{
@@ -94,7 +95,8 @@ namespace SteamDatabase.ValvePak
 		/// <param name="validateCrc">If true, CRC32 will be calculated and verified for read data.</param>
 		public void ReadEntry(PackageEntry entry, out byte[] output, bool validateCrc = true)
 		{
-			ArgumentNullException.ThrowIfNull(entry);
+			if (entry == null)
+				throw new ArgumentNullException(nameof(entry));
 
 			output = new byte[entry.TotalLength];
 
@@ -109,8 +111,10 @@ namespace SteamDatabase.ValvePak
 		/// <param name="validateCrc">If true, CRC32 will be calculated and verified for read data.</param>
 		public void ReadEntry(PackageEntry entry, byte[] output, bool validateCrc = true)
 		{
-			ArgumentNullException.ThrowIfNull(entry);
-			ArgumentNullException.ThrowIfNull(output);
+			if (entry == null)
+				throw new ArgumentNullException(nameof(entry));
+			if (output == null)
+				throw new ArgumentNullException(nameof(output));
 
 			var totalLength = (int)entry.TotalLength;
 
@@ -169,14 +173,41 @@ namespace SteamDatabase.ValvePak
 		{
 			Debug.Assert(Reader != null);
 
-			var stringComparer = Comparer == null ? null : StringComparer.FromComparison(Comparer.Comparison);
+			StringComparer stringComparer = StringComparer.CurrentCulture;
+			if (Comparer != null)
+			{
+				switch (Comparer.Comparison)
+				{
+					case StringComparison.CurrentCulture:
+						stringComparer = StringComparer.CurrentCulture;
+						break;
+					case StringComparison.CurrentCultureIgnoreCase:
+						stringComparer = StringComparer.CurrentCultureIgnoreCase;
+						break;
+					case StringComparison.InvariantCulture:
+						stringComparer = StringComparer.InvariantCulture;
+						break;
+					case StringComparison.InvariantCultureIgnoreCase:
+						stringComparer = StringComparer.InvariantCultureIgnoreCase;
+						break;
+					case StringComparison.Ordinal:
+						stringComparer = StringComparer.Ordinal;
+						break;
+					case StringComparison.OrdinalIgnoreCase:
+						stringComparer = StringComparer.OrdinalIgnoreCase;
+						break;
+					default:
+						throw new ArgumentOutOfRangeException();
+				}
+			}
+
 			var typeEntries = new Dictionary<string, List<PackageEntry>>(stringComparer);
 			using var ms = new MemoryStream();
 
 			// Types
 			while (true)
 			{
-				var typeName = ReadNullTermUtf8String(Reader, ms);
+				var typeName = ReadNullTermUtf8String(Reader!, ms!);
 
 				if (string.IsNullOrEmpty(typeName))
 				{
@@ -188,7 +219,7 @@ namespace SteamDatabase.ValvePak
 				// Directories
 				while (true)
 				{
-					var directoryName = ReadNullTermUtf8String(Reader, ms);
+					var directoryName = ReadNullTermUtf8String(Reader!, ms!);
 
 					if (string.IsNullOrEmpty(directoryName))
 					{
@@ -198,20 +229,20 @@ namespace SteamDatabase.ValvePak
 					// Files
 					while (true)
 					{
-						var fileName = ReadNullTermUtf8String(Reader, ms);
+						var fileName = ReadNullTermUtf8String(Reader!, ms!);
 
 						if (string.IsNullOrEmpty(fileName))
 						{
 							break;
 						}
-
-						var entry = new PackageEntry
-						{
-							FileName = fileName,
-							DirectoryName = directoryName,
-							TypeName = typeName,
-							CRC32 = Reader.ReadUInt32()
-						};
+						if (Reader == null)
+							throw new InvalidOperationException("Reader is not initialized");
+						var entry = new PackageEntry(
+							fileName,
+							directoryName,
+							typeName,
+							Reader.ReadUInt32()
+						);
 						var smallDataSize = Reader.ReadUInt16();
 						entry.ArchiveIndex = Reader.ReadUInt16();
 						entry.Offset = Reader.ReadUInt32();
@@ -251,6 +282,8 @@ namespace SteamDatabase.ValvePak
 
 			Entries = typeEntries;
 
+			if (Reader == null)
+				throw new InvalidOperationException("Reader is not initialized");
 			// Set to real size that was read for hash verification, in case it was tampered with
 			TreeSize = (uint)Reader.BaseStream.Position - HeaderSize;
 		}
@@ -258,7 +291,8 @@ namespace SteamDatabase.ValvePak
 		private void ReadArchiveMD5Section()
 		{
 			Debug.Assert(Reader != null);
-
+			if (Reader == null)
+				throw new InvalidOperationException("Reader is not initialized");
 			FileSizeBeforeArchiveMD5Entries = (uint)Reader.BaseStream.Position;
 
 			if (ArchiveMD5SectionSize == 0)
@@ -274,13 +308,13 @@ namespace SteamDatabase.ValvePak
 			for (var i = 0; i < entries; i++)
 			{
 				var hashFraction = new ChunkHashFraction
-				{
-					ArchiveIndex = Reader.ReadUInt16(),
-					HashType = (EHashType)Reader.ReadUInt16(),
-					Offset = Reader.ReadUInt32(),
-					Length = Reader.ReadUInt32(),
-					Checksum = Reader.ReadBytes(16)
-				};
+				(
+					Reader.ReadUInt16(),
+					(EHashType)Reader.ReadUInt16(),
+					Reader.ReadUInt32(),
+					Reader.ReadUInt32(),
+					Reader.ReadBytes(16)
+				);
 
 				if (hashFraction.ArchiveIndex == 0 && hashFraction.HashType == (EHashType)0x8000)
 				{
@@ -300,6 +334,8 @@ namespace SteamDatabase.ValvePak
 			}
 
 			Debug.Assert(Reader != null);
+			if (Reader == null)
+				throw new InvalidOperationException("Reader is not initialized");
 
 			TreeChecksum = Reader.ReadBytes(16);
 			ArchiveMD5EntriesChecksum = Reader.ReadBytes(16);
@@ -310,7 +346,8 @@ namespace SteamDatabase.ValvePak
 		private void ReadSignatureSection()
 		{
 			Debug.Assert(Reader != null);
-
+			if (Reader == null)
+				throw new InvalidOperationException("Reader is not initialized");
 			FileSizeBeforeSignature = (uint)Reader.BaseStream.Position;
 
 			if (SignatureSectionSize == 0)
@@ -360,7 +397,8 @@ namespace SteamDatabase.ValvePak
 			else
 			{
 				Debug.Assert(Reader != null);
-
+				if (Reader == null)
+					throw new InvalidOperationException("Reader is not initialized");
 				stream = Reader.BaseStream;
 				stream.Seek(HeaderSize + TreeSize, SeekOrigin.Begin);
 			}
@@ -380,7 +418,8 @@ namespace SteamDatabase.ValvePak
 		/// <returns>Stream for a given package entry contents.</returns>
 		public Stream GetMemoryMappedStreamIfPossible(PackageEntry entry)
 		{
-			ArgumentNullException.ThrowIfNull(entry);
+			if (entry == null)
+				throw new ArgumentNullException(nameof(entry));
 
 			if (entry.Length <= 4096 || entry.SmallData.Length > 0)
 			{
@@ -396,7 +435,8 @@ namespace SteamDatabase.ValvePak
 				if (entry.ArchiveIndex == 0x7FFF)
 				{
 					Debug.Assert(Reader != null);
-
+					if (Reader == null)
+						throw new InvalidOperationException("Reader is not initialized");
 					if (Reader.BaseStream is FileStream fileStream)
 					{
 						path = fileStream.Name;
@@ -448,10 +488,12 @@ namespace SteamDatabase.ValvePak
 
 				ms.WriteByte(b);
 			}
-
+			if (reader == null)
+				throw new InvalidOperationException("Reader is not initialized");
 			ms.TryGetBuffer(out var buffer);
 
-			var str = Encoding.UTF8.GetString(buffer);
+			var str = Encoding.UTF8.GetString(buffer.Array, buffer.Offset, buffer.Count);
+
 
 			ms.SetLength(0);
 
