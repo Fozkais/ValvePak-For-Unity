@@ -178,30 +178,9 @@ namespace ValvePak
 		/// </summary>
 		/// <param name="filePath">Full path to the file to find.</param>
 		/// <remarks>
-		/// Normalizes the directory path separator from <see cref="WindowsDirectorySeparator"/> (\) to <see cref="DirectorySeparator"/> (/) in <paramref name="filePath"/>.
-		/// </remarks>
-		public PackageEntry? FindEntry(string filePath)
-		{
-			if (String.IsNullOrEmpty(filePath))
-				throw new ArgumentNullException(nameof(filePath));
-
-			// Normalize path separators when reading the file list
-			var filePathSpan = filePath.Replace(WindowsDirectorySeparator, DirectorySeparatorChar).AsSpan();
-
-			return FindEntry(filePathSpan);
-		}
-
-		/// <summary>
-		/// Searches for a given file entry in the file list.
-		///
-		/// If <see cref="OptimizeEntriesForBinarySearch"/> was called on this package, this method will use <see cref="List{T}.BinarySearch(T, IComparer{T})"/>.
-		/// Optimized packages also support case insensitive search by using a different <see cref="StringComparison"/>.
-		/// </summary>
-		/// <param name="filePath">Full path to the file to find.</param>
-		/// <remarks>
 		/// Unlike the <see cref="FindEntry(string)"/> version, this one does not normalize the directory path separator.
 		/// </remarks>
-		public PackageEntry? FindEntry(ReadOnlySpan<char> filePath)
+		public PackageEntry? FindEntry(string  filePath)
 		{
 			string pathStr = filePath.ToString();
 			var lastSeparator = pathStr.LastIndexOf(DirectorySeparatorChar);
@@ -274,11 +253,10 @@ namespace ValvePak
 
 					if (comp == 0)
 					{
-						comp = fileName.CompareTo(entry.FileName, Comparer.Comparison);
-
+						comp = string.Compare(fileName, entry.FileName, Comparer.Comparison);
 						if (comp == 0)
 						{
-							comp = directory.CompareTo(entry.DirectoryName, Comparer.Comparison);
+							comp = string.Compare(directory, entry.DirectoryName, Comparer.Comparison);
 						}
 					}
 				}

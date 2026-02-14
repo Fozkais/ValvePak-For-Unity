@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.IO.Hashing;
 using System.IO.MemoryMappedFiles;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -161,7 +160,7 @@ namespace ValvePak
 				return;
 			}
 
-			var actualChecksum = Crc32.HashToUInt32(output.AsSpan(0, totalLength));
+			var actualChecksum = Crc32.Compute(output, 0, totalLength);
 
 			if (entry.CRC32 != actualChecksum)
 			{

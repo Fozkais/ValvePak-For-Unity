@@ -4,7 +4,7 @@
 [![NuGet](https://img.shields.io/nuget/v/ValvePak.svg?label=NuGet&style=flat-square)](https://www.nuget.org/packages/ValvePak/)
 [![Coverage Status](https://img.shields.io/codecov/c/github/ValveResourceFormat/ValvePak/master?label=Coverage&style=flat-square)](https://app.codecov.io/gh/ValveResourceFormat/ValvePak)
 
-This Fork make the library compatible with netstandard 2.0 and netstandard 2.1<br/>
+This Fork make the library compatible with netstandard 2.0<br/>
 VPK (Valve Pak) files are uncompressed archives used to package game content.<br/>
 This library allows you to read and extract files out of these paks.
 

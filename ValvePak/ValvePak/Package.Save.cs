@@ -3,7 +3,6 @@ using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.IO.Hashing;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -85,7 +84,7 @@ namespace ValvePak
 				directory,
 				extension,
 				fileData,
-				Crc32.HashToUInt32(fileData),
+				Crc32.Compute(fileData),
 				0x7FFF
 			);
 
